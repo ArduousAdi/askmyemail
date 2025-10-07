@@ -1,0 +1,15 @@
+#macos
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.env
+
+# Auth files (never commit)
+credentials.json
+token.json
+
+# VS Code
+.vscode/
