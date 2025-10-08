@@ -1,24 +1,16 @@
 from __future__ import annotations
-import os
+import os, json
 from typing import List, Dict
 
-# Google API imports
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
-# Gmail read-only scope: safest option
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
 
 def get_gmail_service():
-    """
-    Handles Gmail authentication.
-    - Looks for token.json (cached login)
-    - If missing/expired, uses credentials.json to open a browser login
-    - Saves refreshed token to token.json
-    """
     creds = None
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
@@ -28,10 +20,7 @@ def get_gmail_service():
             creds.refresh(Request())
         else:
             if not os.path.exists("credentials.json"):
-                raise FileNotFoundError(
-                    "⚠️ credentials.json missing! Download it from Google Cloud Console "
-                    "and place it in the project root."
-                )
+                raise FileNotFoundError("⚠️ Missing credentials.json!")
             flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
             creds = flow.run_local_server(port=0)
         with open("token.json", "w") as token:
@@ -41,13 +30,10 @@ def get_gmail_service():
 
 
 def list_unread_emails(service, max_results: int = 10) -> List[Dict]:
-    """
-    Fetches the last `max_results` unread emails (date, from, subject)
-    """
+    """Fetch last N unread emails."""
     results = service.users().messages().list(
         userId="me", labelIds=["INBOX", "UNREAD"], maxResults=max_results
     ).execute()
-
     messages = results.get("messages", [])
     emails = []
 
@@ -60,12 +46,39 @@ def list_unread_emails(service, max_results: int = 10) -> List[Dict]:
         ).execute()
         headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
         emails.append({
+            "id": m["id"],
             "date": headers.get("Date", ""),
             "from": headers.get("From", ""),
             "subject": headers.get("Subject", "(no subject)"),
         })
 
     return emails
+
+
+def save_emails_to_json(emails: List[Dict], filename: str = "emails.json"):
+    """Save fetched emails locally so the app has memory."""
+    if not emails:
+        print("📭 No new emails to save.")
+        return
+
+    # Load existing data if file exists
+    if os.path.exists(filename):
+        with open(filename, "r") as f:
+            old_data = json.load(f)
+    else:
+        old_data = []
+
+    # Avoid duplicates by checking IDs
+    new_emails = [e for e in emails if e["id"] not in {d["id"] for d in old_data}]
+    if not new_emails:
+        print("✅ All emails already saved.")
+        return
+
+    combined = old_data + new_emails
+    with open(filename, "w") as f:
+        json.dump(combined, f, indent=2)
+
+    print(f"💾 Saved {len(new_emails)} new emails to {filename}")
 
 
 def main():
@@ -77,11 +90,11 @@ def main():
         print("✅ No unread emails 🎉")
         return
 
-    print("\n📬 Your latest unread emails:")
+    print("\n📬 Latest unread emails:")
     for e in emails:
         print(f"- {e['date']} | {e['from']} — {e['subject']}")
 
-    print("\n✅ Gmail connection working! Next: saving locally.")
+    save_emails_to_json(emails)
 
 
 if __name__ == "__main__":
