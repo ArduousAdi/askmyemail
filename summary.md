@@ -1,0 +1,1 @@
+⚠️ Gemini summarization failed: Timeout of 600.0s exceeded, last exception: 503 DNS resolution failed for generativelanguage.googleapis.com:443: C-ares status is not ARES_SUCCESS qtype=SRV name=_grpclb._tcp.generativelanguage.googleapis.com: Could not contact DNS servers
