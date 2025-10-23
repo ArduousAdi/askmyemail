@@ -29,6 +29,7 @@ if not GEMINI_API_KEY:
     print("⚠️ GEMINI_API_KEY not set. Add it to your .env file.")
 else:
     genai.configure(api_key=GEMINI_API_KEY)
+    genai.transport = "rest"
 
 
 # ----------------------------------------------------------
@@ -176,7 +177,6 @@ def summarize_emails_with_gemini(emails, title="Summary of selected emails"):
     if not emails:
         return "No emails matched your filters."
 
-    # Limit how much data we send to Gemini for faster output
     bullet_lines = [
         f"- {e.get('date','')[:25]} | {e.get('from','')[:60]} | {e.get('subject','')[:140]}"
         for e in emails[:50]
@@ -194,12 +194,17 @@ Emails:
 {digest}
 """
 
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.0-flash")
     try:
-        resp = model.generate_content(prompt)
+        # Set shorter timeout and 1 retry
+        resp = model.generate_content(prompt, request_options={"timeout": 60})
+        if not resp or not resp.text:
+            time.sleep(3)
+            resp = model.generate_content(prompt, request_options={"timeout": 60})
         return resp.text.strip() if resp and resp.text else "No summary generated."
     except Exception as e:
         return f"⚠️ Gemini summarization failed: {e}"
+
 
 
 # ----------------------------------------------------------
